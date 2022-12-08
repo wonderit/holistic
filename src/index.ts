@@ -5,6 +5,11 @@ import { log } from './util';
 import { video } from './video';
 import { initDraw2D, draw2D, setDraw2dOptions } from './draw2d';
 import { initDraw3D, draw3D, setDraw3dOptions } from './draw3d';
+// import * as Comlink from "comlink";
+// import {VRMManager} from "v3d-core/dist/src/importer/babylon-vrm-loader/src";
+// import {Poses} from "./worker/pose-processing";
+// import {CloneableQuaternionMap} from "./helper/quaternion";
+// import type { Nullable } from '@babylonjs/core';
 
 // instance of holistic model
 const holistic = new h.Holistic({ locateFile: (file) => `../assets/holistic/${file}` }); // `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`
@@ -19,33 +24,55 @@ const dom = {
     new controls.DropDownControl({ title: 'source', field: 'source', options: options.sources }),
     new controls.StaticText({ title: 'model' }),
     new controls.Toggle({ title: 'useCpuInference', field: 'useCpuInference' }),
-    new controls.Toggle({ title: 'smoothLandmarks', field: 'smoothLandmarks' }),
+    // new controls.Toggle({ title: 'smoothLandmarks', field: 'smoothLandmarks' }),
     new controls.Toggle({ title: 'enableFaceGeometry', field: 'enableFaceGeometry' }),
     new controls.Toggle({ title: 'refineFaceLandmarks', field: 'refineFaceLandmarks' }),
-    new controls.Slider({ title: 'minDetectionConfidence', field: 'minDetectionConfidence', range: [0, 1], step: 0.01 }),
-    new controls.Slider({ title: 'minTrackingConfidence', field: 'minTrackingConfidence', range: [0, 1], step: 0.01 }),
+    new controls.Slider({ title: 'minDetectionConfidence', field: 'minDetectionConfidence', range: [0, 1], step: 0.1 }),
+    new controls.Slider({ title: 'minTrackingConfidence', field: 'minTrackingConfidence', range: [0, 1], step: 0.1 }),
     new controls.Slider({ title: 'modelComplexity', field: 'modelComplexity', discrete: ['lite', 'full', 'heavy'] }),
+    new controls.DropDownControl({ title: 'exampleSource', field: 'exampleSource', options: options.exampleSources }),
     new controls.StaticText({ title: 'render' }),
     new controls.Toggle({ title: 'showInspector', field: 'showInspector' }),
-    new controls.Toggle({ title: 'boundingBoxes', field: 'boundingBoxes' }),
-    new controls.Toggle({ title: 'continousFocus', field: 'continousFocus' }),
-    new controls.Toggle({ title: 'renderFace', field: 'renderFace' }),
-    new controls.Toggle({ title: 'smoothFace', field: 'smoothFace' }),
-    new controls.Toggle({ title: 'connectFace', field: 'connectFace' }),
+    // new controls.Toggle({ title: 'boundingBoxes', field: 'boundingBoxes' }),
+    // new controls.Toggle({ title: 'continousFocus', field: 'continousFocus' }),
+    // new controls.Toggle({ title: 'renderFace', field: 'renderFace' }),
+    // new controls.Toggle({ title: 'smoothFace', field: 'smoothFace' }),
+    // new controls.Toggle({ title: 'connectFace', field: 'connectFace' }),
     new controls.Toggle({ title: 'renderBones', field: 'renderBones' }),
     new controls.Toggle({ title: 'renderJoints', field: 'renderJoints' }),
     new controls.Toggle({ title: 'renderHands', field: 'renderHands' }),
     new controls.Toggle({ title: 'connectHands', field: 'connectHands' }),
     new controls.Toggle({ title: 'renderSurface', field: 'renderSurface' }),
-    new controls.Toggle({ title: 'deleteDuplicates', field: 'deleteDuplicates' }),
-    new controls.Toggle({ title: 'fixedRadius', field: 'fixedRadius' }),
-    new controls.Slider({ title: 'baseRadius', field: 'baseRadius', range: [0.01, 0.20], step: 0.01 }),
-    new controls.Slider({ title: 'scaleX', field: 'scaleX', range: [0.1, 2.0], step: 0.01 }),
-    new controls.Slider({ title: 'scaleY', field: 'scaleY', range: [0.1, 2.0], step: 0.01 }),
-    new controls.Slider({ title: 'scaleZ', field: 'scaleZ', range: [0.1, 2.0], step: 0.01 }),
-    new controls.Slider({ title: 'lerpAmount', field: 'lerpAmount', range: [0.0, 1.0], step: 0.01 }),
+    // new controls.Toggle({ title: 'deleteDuplicates', field: 'deleteDuplicates' }),
+    new controls.Toggle({ title: 'showSkeleton', field: 'showSkeleton' }),
+    // new controls.Toggle({ title: 'fixedRadius', field: 'fixedRadius' }),
+    // new controls.Slider({ title: 'baseRadius', field: 'baseRadius', range: [0.01, 0.20], step: 0.01 }),
+    // new controls.Slider({ title: 'scaleX', field: 'scaleX', range: [0.1, 2.0], step: 0.01 }),
+    // new controls.Slider({ title: 'scaleY', field: 'scaleY', range: [0.1, 2.0], step: 0.01 }),
+    // new controls.Slider({ title: 'scaleZ', field: 'scaleZ', range: [0.1, 2.0], step: 0.01 }),
+    // new controls.Slider({ title: 'lerpAmount', field: 'lerpAmount', range: [0.0, 1.0], step: 0.01 }),
   ],
 };
+
+
+export interface HolisticState {
+  ready: boolean;
+  activeEffect: string;
+  holisticUpdate: boolean;
+}
+export interface BoneState {
+  boneRotations: Nullable<CloneableQuaternionMap>;
+  bonesNeedUpdate: boolean;
+}
+export interface BoneOptions {
+  blinkLinkLR: boolean;
+  expression: "Neutral" | "Happy" | "Angry" | "Sad" | "Relaxed" | "Surprised";
+  irisLockX: boolean;
+  lockFinger: boolean;
+  lockArm: boolean;
+  lockLeg: boolean;
+  resetInvisible: boolean;
+}
 
 // send request for processing
 let lastRequestTime = -1;
@@ -90,8 +117,20 @@ async function startSource(src: string) {
   await initDraw2D(dom.output2D);
   await initDraw3D(dom.output3D, options);
   log('startSource', { source: src });
-  if (src.includes('.webm') || src.includes('.mp4')) await video.start({ element: dom.input, width: window.innerHeight / 2, height: window.innerHeight / 2, src });
-  else if (src.includes('webcam')) await video.start({ element: dom.input, crop: true, width: window.innerHeight / 2, height: window.innerHeight / 2, src: undefined });
+  const example = document.getElementById('example-video') as HTMLVideoElement;
+  if (src.includes('.webm') || src.includes('.mp4')) {
+    example.style.visibility = 'hidden';
+    await video.start({ element: dom.input, width: window.innerHeight / 2, height: window.innerHeight / 2, src });
+  }
+  else if (src.includes('webcam')) {
+    example.style.visibility = 'visible';
+    await video.start({ element: dom.input, crop: true, width: window.innerHeight / 2, height: window.innerHeight / 2, src: undefined });
+  }
+}
+
+async function changeExampleSource(src: string) {
+  const example = document.getElementById('example-video') as HTMLVideoElement;
+  example.src = src;
 }
 
 async function warmup() {
@@ -112,6 +151,10 @@ async function main() {
     .on((values) => {
       log('setOptions', values, values.source, options.activeSource);
       if (values.source !== options.activeSource) startSource(values.source as string);
+
+      // Change Example Video
+      if (values.exampleSource !== options.activeExampleSource) changeExampleSource(values.exampleSource as string);
+
       Object.assign(options, values);
       options.activeSource = values['source'] as string;
       holistic.setOptions(options as h.Options);
@@ -126,5 +169,13 @@ async function main() {
   holistic.onResults(onResults); // register callback
   window.onresize = () => resizeOutput();
 }
+
+const debugButton = document.getElementById('debug-button');
+const controlPanel = document.getElementById('control-panel') as HTMLDivElement;
+// @ts-ignore
+debugButton.onclick = () => {
+  if (controlPanel.style.display === 'none') controlPanel.style.display = 'block';
+  else controlPanel.style.display = 'none';
+};
 
 window.onload = main;

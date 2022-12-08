@@ -127,7 +127,7 @@ async function drawTorso(result: h.NormalizedLandmarkList) {
     [vec(result?.[h.POSE_LANDMARKS.LEFT_SHOULDER]), vec(result?.[h.POSE_LANDMARKS.LEFT_HIP])],
     [vec(result?.[h.POSE_LANDMARKS.RIGHT_SHOULDER]), vec(result?.[h.POSE_LANDMARKS.RIGHT_HIP])],
   ];
-  drawRibbon('pose', 'torso', verticals, visibility);
+  // drawRibbon('pose', 'torso', verticals, visibility);
 }
 
 const poseName: string[] = [];

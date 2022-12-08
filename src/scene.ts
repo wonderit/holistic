@@ -97,7 +97,7 @@ export class Scene {
     if (this.environment.skybox) this.environment.skybox.name = 'skybox';
     if (this.environment.ground?.material) this.environment.ground.material.name = 'ground';
     if (this.environment.skybox?.material) this.environment.skybox.material.name = 'skybox';
-    if (this.environment.ground?.material) this.environment.ground.material['primaryColor'] = B.Color3.FromHexString('#640015');
+    if (this.environment.ground?.material) this.environment.ground.material['primaryColor'] = B.Color3.FromHexString('#094780');
     // lights & shadows
     this.ambient = new B.HemisphericLight('spheric', new B.Vector3(0, 1, 0), this.scene);
     this.ambient.intensity = 0.5;
